@@ -1,11 +1,10 @@
 // The wasm-pack uses wasm-bindgen to build and generate JavaScript binding file.
 // Import the wasm-bindgen crate.
-use std::f64;
+use serde::{Serialize, Deserialize};
 
 use wasm_bindgen::prelude::*;
 use blackjack::card::card::*;
 use blackjack::player::player::*;
-use wasm_bindgen::JsCast;
 
 // lifted from the `console_log` example
 #[wasm_bindgen]
@@ -15,72 +14,113 @@ extern "C" {
 }
 
 #[wasm_bindgen]
-#[derive(Copy, Clone)]
-pub enum Suit {
-  HEART, 
-  DIAMOND, 
-  SPADE,
-  CLUB,
-}
-
-#[wasm_bindgen]
-#[derive(Clone)]
-pub struct Card {
-  suit: Suit,
-  value: String,
-  position_x: f64,
-  position_y: f64,
-}
-
-#[wasm_bindgen]
 pub struct Game {
-  players: usize,
-  deck: usize,
-  // cards: Vec<Card>,
-}
-
-
-// Our Add function
-// wasm-pack requires "exported" functions
-// to include #[wasm_bindgen]
-#[wasm_bindgen]
-pub fn add(a: i32, b: i32) -> i32 {
-  return a + b;
+  actors: GameActors,
 }
 
 #[wasm_bindgen]
-pub fn create_game(players: usize, deck: usize) {
+pub struct GameActors {
+  player: Player,
+  deck: Deck,
+  dealer: Player,
+}
+
+#[wasm_bindgen]
+pub fn create_game() -> GameActors {
   // A single deck of cards
-  let mut _deck = Deck::new(1);
+  let mut deck = Deck::new(1);
+  let player: Player = Player::new("Player One".to_string(), false, 1000);
+  let dealer = Player::new(String::from("Dealer"), true, -1);
+  
+  deck.reset();
 
-  let mut players: Vec<Player> = Vec::with_capacity(players);
-  let player_a = Player::new(String::from("Player A"), false, 1000);
-  let player_b = Player::new(String::from("Player B"), false, 1000);
-  players.push(player_a);
-  players.push(player_b);
+  GameActors {
+    player: player,
+    deck: deck,
+    dealer: dealer,
+  }
+}
 
-  let _dealer = Player::new(String::from("Dealer"), true, -1);
+#[derive(Serialize, Deserialize)]
+pub struct SerializedPlayerAction {
+  decision: String,
 }
 
 #[wasm_bindgen]
 impl Game {
   #[wasm_bindgen(constructor)]
-  pub fn new(players: usize, deck: usize) -> Self {
-
-    //TODO generate card and place them in the game.
+  pub fn new() -> Self {
     Self {
-      players: players,
-      deck: deck,
+      actors: create_game(),
     }
   }
 
-  pub fn update(&mut self, _time: f32, _height: f32, _width: f32) -> Result<(), JsValue> {  
-    Ok(())
+  // Converts a json action into a SerializedAction. Passing an object containing a string
+  // Unwrap it to turn it into a serialized player action (a rust object).
+  pub fn player_decision(&self, action: JsValue) {
+    
+    let serialized_action: SerializedPlayerAction = action.into_serde().unwrap();
+    let decision = String::from(serialized_action.decision);
+
+    match decision.as_str() {
+      "HIT" => {
+        log("HIT!!!");
+      },
+      "STAND" => {
+        log("STAND!!!");
+      },
+      "DOUBLE" => {
+        log("DOUBLE!!!");
+      },
+      "SPLIT" => {
+        log("SPLIT!!!");
+      },
+      "SURRENDER" => {
+        log("SURRENDER!!!");
+      },
+      _ => {
+        log("Unknown Decision");
+      }
+    }
+
   }
 
-  pub fn render(&self) {
-    log("Render was hit");
-
+  // Input from JS.
+  pub fn make_bet(&mut self, bet: i32) -> bool {
+    let player = &mut self.actors.player;
+    let player_balance = player.get_balance();
+    if bet <= 0 || player_balance < bet {
+      return false;
+    }
+    player.bet(bet, &mut self.actors.deck);
+    return true;
   }
+
+  pub fn dealer_draw_card(&mut self) {
+    self.actors.dealer.bet(0, &mut self.actors.deck);
+  }
+
+  pub fn player_hand(&self) -> JsValue {
+    let player = &self.actors.player;
+    let mut cards: Vec<String> = Vec::with_capacity(20);
+    for (_, hand) in player.hand_iter().enumerate() {
+      for (_, card) in hand.card_iter().enumerate() {
+        cards.push(card.to_string());
+      }
+    }
+    JsValue::from_serde(&cards).unwrap()
+  }
+
+  pub fn dealer_hand(&self) -> JsValue {
+    let dealer = &self.actors.dealer;
+    let mut cards: Vec<String> = Vec::with_capacity(20);
+    for (_, hand) in dealer.hand_iter().enumerate() {
+      for (_, card) in hand.card_iter().enumerate() {
+        cards.push(card.to_string());
+      }
+    }
+    JsValue::from_serde(&cards).unwrap()
+  }
+
 
 }

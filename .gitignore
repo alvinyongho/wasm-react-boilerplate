@@ -28,4 +28,4 @@ bin/
 wasm-pack.log
 Cargo.lock
 **/*.rs.bk
-/target
+wasm/target/
