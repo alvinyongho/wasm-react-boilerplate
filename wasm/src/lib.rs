@@ -57,32 +57,35 @@ impl Game {
 
   // Converts a json action into a SerializedAction. Passing an object containing a string
   // Unwrap it to turn it into a serialized player action (a rust object).
-  pub fn player_decision(&self, action: JsValue) {
-    
+  pub fn player_decision(&mut self, action: JsValue) {
+    let player = &mut self.actors.player;
+    let deck = &mut self.actors.deck;
+
     let serialized_action: SerializedPlayerAction = action.into_serde().unwrap();
     let decision = String::from(serialized_action.decision);
 
     match decision.as_str() {
       "HIT" => {
-        log("HIT!!!");
+        player.hit(deck);
       },
       "STAND" => {
-        log("STAND!!!");
-      },
-      "DOUBLE" => {
-        log("DOUBLE!!!");
-      },
-      "SPLIT" => {
-        log("SPLIT!!!");
+        player.stand();
       },
       "SURRENDER" => {
-        log("SURRENDER!!!");
+        player.surrender();
       },
       _ => {
         log("Unknown Decision");
       }
     }
+  }
 
+  pub fn is_player_playing(&self) -> bool {
+    return self.actors.player.is_playing();
+  }
+
+  pub fn has_player_lost(&self) -> bool {
+    return self.actors.player.has_lost();
   }
 
   // Input from JS.
@@ -100,6 +103,18 @@ impl Game {
     self.actors.dealer.bet(0, &mut self.actors.deck);
   }
 
+  pub fn dealer_play_as_dealer(&mut self) -> u32 {
+    let deck = &mut self.actors.deck;
+    return self.actors.dealer.play_as_dealer(deck);
+  }
+
+  pub fn game_over(&mut self, dealer_value: u32) {
+    let player = &mut self.actors.player;
+    let dealer = &mut self.actors.dealer;
+    player.game_over(dealer_value);
+    dealer.game_over(0);
+  }
+
   pub fn player_hand(&self) -> JsValue {
     let player = &self.actors.player;
     let mut cards: Vec<String> = Vec::with_capacity(20);
@@ -109,6 +124,11 @@ impl Game {
       }
     }
     JsValue::from_serde(&cards).unwrap()
+  }
+
+  pub fn player_balance(&self) -> i32 {
+    let player = &self.actors.player;
+    return player.get_balance();
   }
 
   pub fn dealer_hand(&self) -> JsValue {

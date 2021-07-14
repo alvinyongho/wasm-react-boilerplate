@@ -75,3 +75,8 @@ code {
   display: flex;
   justify-content: center;
 }
+
+button.MuiButton-root {
+  margin-left: 5px;
+  margin-right: 5px;
+}
